@@ -4,15 +4,14 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
 
-# Free local embeddings — no API needed
 embeddings = HuggingFaceEmbeddings(
     model_name="all-MiniLM-L6-v2"
 )
 
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+# ✅ Changed from PersistentClient → EphemeralClient
+chroma_client = chromadb.EphemeralClient()
 
 def fetch_arxiv_papers(query: str, max_results: int = 10):
-    """Fetch papers from arXiv based on query"""
     search = arxiv.Search(
         query=query,
         max_results=max_results,
@@ -33,7 +32,6 @@ def fetch_arxiv_papers(query: str, max_results: int = 10):
     return papers
 
 def store_and_retrieve(query: str, papers: list, k: int = 4):
-    """Store papers in ChromaDB and retrieve most relevant"""
     vectorstore = Chroma.from_documents(
         documents=papers,
         embedding=embeddings,
