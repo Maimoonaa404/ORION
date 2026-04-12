@@ -135,38 +135,6 @@ Generate the Python code:""")
     ])
     chain = prompt | llm
     result = chain.invoke({"query": query, "context": context[:2000]})
-    # Strip markdown code fences if the model added them
-    code = result.content.strip()
-    if code.startswith("```"):
-        code = "\n".join(code.split("\n")[1:])
-    if code.endswith("```"):
-        code = "\n".join(code.split("\n")[:-1])
-    return code.strip()
-
-
-def generate_model_file(query: str, context: str, model_name: str) -> str:
-    """Generates a standalone Python model file for a given model name"""
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a machine learning code generation agent.
-Generate a complete, standalone Python file for the specified model.
-Include imports, class definition with __init__ and forward/predict methods,
-a brief training loop sketch, and example usage in an if __name__ == '__main__' block.
-Use comments to explain design decisions.
-Return ONLY the Python code — no markdown fences."""),
-        ("human", """Query: {query}
-Model to implement: {model_name}
-
-Research Context:
-{context}
-
-Generate the complete model file:""")
-    ])
-    chain = prompt | llm
-    result = chain.invoke({
-        "query": query,
-        "model_name": model_name,
-        "context": context[:2000]
-    })
     code = result.content.strip()
     if code.startswith("```"):
         code = "\n".join(code.split("\n")[1:])
