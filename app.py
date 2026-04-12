@@ -15,7 +15,6 @@ from agents import (
     check_response_quality,
     generate_code_stub,
     user_requested_code,
-    generate_model_file,
 )
 
 st.set_page_config(
@@ -32,7 +31,7 @@ st.divider()
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    max_papers  = st.slider("Papers to retrieve", 5, 20, 10)
+    max_papers = st.slider("Papers to retrieve", 5, 20, 10)
     sources = st.multiselect(
         "Paper sources",
         options=["arXiv", "Semantic Scholar", "Crossref"],
@@ -41,11 +40,6 @@ with st.sidebar:
     )
     show_sources = st.checkbox("Show source papers", value=True)
     show_agents  = st.checkbox("Show agent reasoning", value=True)
-    model_targets_text = st.text_input(
-        "Model files (comma-separated)",
-        value="",
-        help="When code is requested, ORION generates one file per model name."
-    )
     st.divider()
 
     # ── Document Upload ───────────────────────────────────────────────────────
@@ -116,14 +110,9 @@ if st.button("🚀 Run ORION", type="primary", use_container_width=True):
     else:
         response   = ""
         code_stub  = ""
-        model_files = {}
         quality    = {}
         retrieved  = []
         wants_code = user_requested_code(query)
-
-        model_targets = [m.strip() for m in model_targets_text.split(",") if m.strip()]
-        if not model_targets:
-            model_targets = ["general"]
 
         # ── Agent 0 — Router ──────────────────────────────────────────────────
         with st.status("🧭 Agent 0: Classifying query...", expanded=show_agents) as status:
@@ -169,7 +158,8 @@ if st.button("🚀 Run ORION", type="primary", use_container_width=True):
                     status.update(label="⚠️ No papers found for selected sources", state="complete")
                 else:
                     retrieved = store_and_retrieve(query, all_papers)
-                upload_count = sum(1 for d in retrieved if d.metadata.get("source") == "upload")
+
+                upload_count   = sum(1 for d in retrieved if d.metadata.get("source") == "upload")
                 external_count = len(retrieved) - upload_count
                 label = f"✅ Retrieved {len(retrieved)} sources"
                 if upload_count:
@@ -187,30 +177,26 @@ if st.button("🚀 Run ORION", type="primary", use_container_width=True):
                 quality = check_response_quality(query, response)
                 status.update(label="✅ Agent 3: Quality verified", state="complete")
 
-            # Agent 4 — Code Generation (only on explicit user request)
+            # Agent 4 — Code Stub (only on explicit user request)
             if wants_code:
-                with st.status("💻 Agent 4: Generating model files...", expanded=False) as status:
-                    for model_name in model_targets:
-                        model_files[model_name] = generate_model_file(query, response, model_name)
+                with st.status("💻 Agent 4: Generating code stub...", expanded=False) as status:
                     code_stub = generate_code_stub(query, response)
-                    status.update(label=f"✅ Generated {len(model_files)} model file(s)", state="complete")
+                    status.update(label="✅ Agent 4: Code stub generated", state="complete")
 
         # ══════════════════════════════════════════════════════════════════════
-        # ROUTE: code only — skip arXiv entirely
+        # ROUTE: code only — skip retrieval entirely
         # ══════════════════════════════════════════════════════════════════════
         elif query_type == "code":
             with st.status("💻 Agent 4: Generating code directly...", expanded=show_agents) as status:
-                for model_name in model_targets:
-                    model_files[model_name] = generate_model_file(query, query, model_name)
                 code_stub = generate_code_stub(query, query)
-                response  = ""   # no research summary for pure code
+                response  = ""
                 quality   = {"answers_query": True, "has_citations": False, "confidence": "high"}
-                status.update(label=f"✅ Generated {len(model_files)} model file(s)", state="complete")
+                status.update(label="✅ Code generated", state="complete")
 
         # ── Results ───────────────────────────────────────────────────────────
         st.divider()
 
-        # Quality badges (skip for pure code — citations badge is misleading there)
+        # Quality badges (skip for pure code)
         if query_type != "code":
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -232,46 +218,30 @@ if st.button("🚀 Run ORION", type="primary", use_container_width=True):
                 else:
                     st.error(f"❌ Confidence: {confidence}")
 
-        # Research Summary (only for research / both)
+        # Research Summary
         if response:
             st.divider()
             st.markdown("### 📋 Research Summary")
             st.markdown(response)
 
-        # Code Stub / Model Files
+        # Code Stub
         if code_stub and wants_code:
             st.divider()
             st.markdown("### 💻 Code Stub")
             st.caption("Auto-generated Python stub based on the query above.")
             st.code(code_stub, language="python")
 
-        if model_files and wants_code:
-            st.divider()
-            st.markdown("### 🗂️ Model Files")
-            for model_name, content in model_files.items():
-                safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", model_name.strip().lower())
-                filename = f"{safe_name}_model.py"
-                st.markdown(f"**`{filename}`**")
-                st.code(content, language="python")
-                st.download_button(
-                    label=f"Download {filename}",
-                    data=content,
-                    file_name=filename,
-                    mime="text/x-python",
-                    key=f"download_{filename}"
-                )
-
-        # Source Papers (only when retrieval happened)
+        # Source Papers
         if show_sources and retrieved:
             st.divider()
             st.markdown("### 📄 Source Papers")
             for i, doc in enumerate(retrieved):
                 source_name = doc.metadata.get("source", "unknown")
                 source_labels = {
-                    "upload": "📎 Uploaded",
-                    "arxiv": "🔬 arXiv",
+                    "upload":           "📎 Uploaded",
+                    "arxiv":            "🔬 arXiv",
                     "semantic_scholar": "🧠 Semantic Scholar",
-                    "crossref": "📚 Crossref",
+                    "crossref":         "📚 Crossref",
                 }
                 source_tag = source_labels.get(source_name, f"📄 {source_name}")
                 with st.expander(f"[{i+1}] {source_tag} — {doc.metadata.get('title', 'Unknown')}"):
