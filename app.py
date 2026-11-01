@@ -34,7 +34,7 @@ with st.sidebar:
     max_papers = st.slider("Papers to retrieve", 5, 20, 10)
     sources = st.multiselect(
         "Paper sources",
-        options=["arXiv", "Semantic Scholar", "Crossref"],
+        options=["arXiv"],
         default=["arXiv"],
         help="Select one or more paper databases."
     )
@@ -92,8 +92,7 @@ with st.sidebar:
     st.markdown("**Stack:**")
     st.markdown("- LangChain orchestration")
     st.markdown("- ChromaDB vector store")
-    st.markdown("- Multi-source paper retrieval")
-    st.markdown("- Groq / LLaMA 3")
+    st.markdown("- Groq ")
 
 # ── Main Input ────────────────────────────────────────────────────────────────
 query = st.text_area(
